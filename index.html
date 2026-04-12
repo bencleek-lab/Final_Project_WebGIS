@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>U.S. Hydroelectric Dams by State</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; background: #f4f4f4; display: flex; flex-direction: column; height: 100vh; }
+
+    #header {
+      background-color: #1a3a5c;
+      color: white;
+      padding: 14px 20px;
+      font-size: 20px;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+
+    #main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    #map {
+      flex: 0 0 70%;
+      height: 100%;
+    }
+
+    #sidebar {
+      flex: 0 0 30%;
+      background: #ffffff;
+      padding: 20px;
+      overflow-y: auto;
+      border-left: 2px solid #ddd;
+    }
+
+    #sidebar h2 {
+      font-size: 16px;
+      color: #1a3a5c;
+      margin-bottom: 6px;
+    }
+
+    #sidebar .stat-box {
+      background: #f0f4f8;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    #sidebar .stat-box .number {
+      font-size: 32px;
+      font-weight: bold;
+      color: #1a3a5c;
+    }
+
+    #sidebar .stat-box .label {
+      font-size: 12px;
+      color: #666;
+      margin-top: 2px;
+    }
+
+    .bar-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 13px;
+    }
+
+    .bar-label {
+      width: 120px;
+      flex-shrink: 0;
+      color: #333;
+    }
+
+    .bar-track {
+      flex: 1;
+      background: #e8f0f8;
+      border-radius: 4px;
+      height: 18px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      background: #2171b5;
+      border-radius: 4px;
+      transition: width 0.3s;
+    }
+
+    .bar-count {
+      width: 36px;
+      text-align: right;
+      flex-shrink: 0;
+      color: #1a3a5c;
+      font-weight: bold;
+      font-size: 12px;
+      margin-left: 6px;
+    }
+
+    .legend {
+      background: white;
+      padding: 10px 14px;
+      line-height: 1.8;
+      border-radius: 5px;
+      box-shadow: 0 1px 5px rgba(0,0,0,0.3);
+    }
+
+    .legend i {
+      width: 18px;
+      height: 18px;
+      display: inline-block;
+      margin-right: 6px;
+      opacity: 0.8;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="header">U.S. Hydroelectric Dams by State</div>
+
+  <div id="main">
+    <div id="map"></div>
+
+    <div id="sidebar">
+
+      <div class="stat-box">
+        <div class="number" id="total-count">0</div>
+        <div class="label">Total Hydroelectric Dams in the U.S.</div>
+      </div>
+
+      <div class="stat-box">
+        <div class="number" id="state-count">49</div>
+        <div class="label">States with at least one hydroelectric dam</div>
+      </div>
+
+      <h2>Top 10 States by Dam Count</h2>
+      <div id="bar-chart"></div>
+
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+
+    const damCounts = {
+      "Alabama": 32, "Alaska": 32, "Arizona": 10, "Arkansas": 24,
+      "California": 333, "Colorado": 61, "Connecticut": 43, "Florida": 2,
+      "Georgia": 64, "Hawaii": 1, "Idaho": 58, "Illinois": 14,
+      "Indiana": 6, "Iowa": 10, "Kansas": 1, "Kentucky": 11,
+      "Louisiana": 2, "Maine": 233, "Maryland": 5, "Massachusetts": 90,
+      "Michigan": 115, "Minnesota": 66, "Missouri": 10, "Montana": 30,
+      "Nebraska": 41, "Nevada": 2, "New Hampshire": 98, "New Jersey": 11,
+      "New Mexico": 3, "New York": 263, "North Carolina": 100,
+      "North Dakota": 2, "Ohio": 5, "Oklahoma": 20, "Oregon": 78,
+      "Pennsylvania": 28, "Puerto Rico": 17, "Rhode Island": 9,
+      "South Carolina": 73, "South Dakota": 6, "Tennessee": 46,
+      "Texas": 32, "Utah": 11, "Vermont": 92, "Virginia": 55,
+      "Washington": 73, "West Virginia": 12, "Wisconsin": 179, "Wyoming": 21
+    };
+
+    // Calculate total and build top 10
+    const total = Object.values(damCounts).reduce((a, b) => a + b, 0);
+    document.getElementById("total-count").textContent = total.toLocaleString();
+
+    const top10 = Object.entries(damCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10);
+
+    const maxVal = top10[0][1];
+    const chartDiv = document.getElementById("bar-chart");
+    top10.forEach(([state, count]) => {
+      const pct = (count / maxVal * 100).toFixed(1);
+      chartDiv.innerHTML += `
+        <div class="bar-row">
+          <div class="bar-label">${state}</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:${pct}%"></div>
+          </div>
+          <div class="bar-count">${count}</div>
+        </div>`;
+    });
+
+    function getColor(count) {
+      return count > 200 ? "#084594" :
+             count > 100 ? "#2171b5" :
+             count > 60  ? "#4292c6" :
+             count > 30  ? "#6baed6" :
+             count > 10  ? "#9ecae1" :
+             count > 0   ? "#deebf7" :
+                           "#f0f0f0";
+    }
+
+    const map = L.map("map").setView([39.5, -98.35], 4);
+
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',
+      maxZoom: 19
+    }).addTo(map);
+
+    fetch("us-states.geojson")
+      .then(r => {
+        if (!r.ok) throw new Error("Could not load us-states.geojson");
+        return r.json();
+      })
+      .then(data => {
+
+        const geojsonLayer = L.geoJSON(data, {
+          style: function(feature) {
+            const count = damCounts[feature.properties.NAME] || 0;
+            return {
+              fillColor: getColor(count),
+              weight: 1,
+              color: "#555",
+              fillOpacity: 0.75
+            };
+          },
+          onEachFeature: function(feature, layer) {
+            const name = feature.properties.NAME;
+            const count = damCounts[name] || 0;
+            layer.bindPopup("<b>" + name + "</b><br>Hydroelectric Dams: <b>" + count + "</b>");
+            layer.on({
+              mouseover: e => e.target.setStyle({ weight: 2, color: "#222", fillOpacity: 0.9 }),
+              mouseout: e => geojsonLayer.resetStyle(e.target)
+            });
+          }
+        }).addTo(map);
+
+      })
+      .catch(err => console.error("GeoJSON error:", err));
+
+    const legend = L.control({ position: "bottomright" });
+    legend.onAdd = function() {
+      const div = L.DomUtil.create("div", "legend");
+      const grades = [0, 1, 10, 30, 60, 100, 200];
+      const labels = ["0", "1–10", "11–30", "31–60", "61–100", "101–200", "200+"];
+      div.innerHTML = "<b>Dam Count</b><br>";
+      for (let i = 0; i < grades.length; i++) {
+        div.innerHTML +=
+          '<i style="background:' + getColor(grades[i] + 1) + '"></i>' +
+          labels[i] + "<br>";
+      }
+      return div;
+    };
+    legend.addTo(map);
+
+    L.control.scale({ imperial: true, metric: true }).addTo(map);
+
+  </script>
+</body>
+</html>
